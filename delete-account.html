@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#080d1b" />
+    <title>Удаление аккаунта — Мастер⚙Учет</title>
+    <style>
+      :root { color-scheme: dark; font-family: Inter, system-ui, -apple-system, "Segoe UI", sans-serif; background: #080d1b; color: #f8fafc; }
+      * { box-sizing: border-box; }
+      body { min-height: 100vh; margin: 0; display: grid; place-items: center; padding: 24px 16px; }
+      main { width: min(100%, 460px); padding: 28px; border: 1px solid #273449; border-radius: 24px; background: #111a2c; box-shadow: 0 24px 80px #0006; }
+      h1 { margin: 0 0 8px; font-size: 24px; }
+      p { color: #cbd5e1; line-height: 1.55; }
+      label { display: block; margin: 16px 0 7px; color: #cbd5e1; font-size: 14px; font-weight: 650; }
+      input { width: 100%; min-height: 48px; border: 1px solid #334155; border-radius: 13px; padding: 0 14px; background: #070c19; color: #fff; font: inherit; }
+      input:focus { outline: 2px solid #2563eb; outline-offset: 2px; }
+      button { width: 100%; min-height: 48px; margin-top: 18px; border: 0; border-radius: 13px; background: #e11d48; color: white; font: inherit; font-weight: 800; cursor: pointer; }
+      button:disabled { cursor: wait; opacity: .65; }
+      #status { min-height: 24px; margin-bottom: 0; font-size: 14px; }
+      .muted { color: #94a3b8; font-size: 13px; }
+      .error { color: #fda4af; }
+      .success { color: #86efac; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Удаление аккаунта Мастер⚙Учет</h1>
+      <p>Войдите в удаляемый аккаунт и подтвердите действие. Будут удалены аккаунт Supabase, облачные ремонты, складские записи, задачи, профиль и фотографии этого аккаунта. Действие необратимо.</p>
+      <form id="delete-form">
+        <label for="email">Email аккаунта</label>
+        <input id="email" name="email" type="email" autocomplete="username" required />
+        <label for="password">Пароль</label>
+        <input id="password" name="password" type="password" autocomplete="current-password" required />
+        <label for="confirmation">Для подтверждения введите УДАЛИТЬ</label>
+        <input id="confirmation" name="confirmation" autocomplete="off" required />
+        <button id="submit" type="submit">Удалить аккаунт и облачные данные</button>
+      </form>
+      <p id="status" role="status" aria-live="polite"></p>
+      <p class="muted">Пароль используется только для входа в Supabase и не сохраняется этой страницей. Если вы уже вошли в приложение и хотите очистить локальные данные устройства, используйте удаление аккаунта в настройках приложения.</p>
+    </main>
+    <script>
+      const supabaseUrl = 'https://cwsnmflbeqwkznxyjywn.supabase.co';
+      const publicKey = 'sb_publishable_Gg3HIUE73U8v_NCCpBuwsQ_dpqOrADy';
+      const form = document.querySelector('#delete-form');
+      const submit = document.querySelector('#submit');
+      const status = document.querySelector('#status');
+
+      form.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        status.textContent = '';
+        status.className = '';
+        const data = new FormData(form);
+        if (String(data.get('confirmation')).trim() !== 'УДАЛИТЬ') {
+          status.textContent = 'Введите УДАЛИТЬ, чтобы подтвердить действие.';
+          status.className = 'error';
+          return;
+        }
+
+        submit.disabled = true;
+        submit.textContent = 'Проверяем аккаунт…';
+        try {
+          const signInResponse = await fetch(`${supabaseUrl}/auth/v1/token?grant_type=password`, {
+            method: 'POST',
+            headers: { apikey: publicKey, 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              email: String(data.get('email')).trim(),
+              password: String(data.get('password')),
+            }),
+          });
+          const session = await signInResponse.json();
+          if (!signInResponse.ok || !session.access_token) {
+            throw new Error(session.msg || session.message || session.error_description || session.error || 'Не удалось войти. Проверьте email и пароль.');
+          }
+
+          submit.textContent = 'Удаляем данные…';
+          const deleteResponse = await fetch(`${supabaseUrl}/functions/v1/delete-account`, {
+            method: 'POST',
+            headers: {
+              apikey: publicKey,
+              Authorization: `Bearer ${session.access_token}`,
+              'Content-Type': 'application/json',
+            },
+            body: '{}',
+          });
+          const result = await deleteResponse.json();
+          if (!deleteResponse.ok || !result.success) {
+            throw new Error(result.error || 'Не удалось удалить аккаунт. Повторите попытку позже.');
+          }
+
+          form.reset();
+          status.textContent = 'Аккаунт и облачные данные удалены.';
+          status.className = 'success';
+        } catch (error) {
+          status.textContent = error?.message || 'Не удалось удалить аккаунт. Повторите попытку позже.';
+          status.className = 'error';
+        } finally {
+          submit.disabled = false;
+          submit.textContent = 'Удалить аккаунт и облачные данные';
+        }
+      });
+    </script>
+  </body>
+</html>
