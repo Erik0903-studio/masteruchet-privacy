@@ -1,5 +1,4 @@
 User-agent: *
 Allow: /
-Disallow: /web.html
 
 Sitemap: https://masteruchetapp.ru/sitemap.xml
